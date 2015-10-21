@@ -27,7 +27,7 @@ import struct
 import errno
 import logging
 from shadowsocks import eventloop, asyncdns, lru_cache, encrypt
-from shadowsocks import utils as shadowsocks_utils
+from shadowsocks import shell as shadowsocks_shell
 from shadowsocks.common import parse_header
 
 
@@ -64,9 +64,8 @@ class DNSRelay(object):
         if self._loop:
             raise Exception('already add to loop')
         self._loop = loop
-        loop.add_handler(self.handle_events)
 
-    def handle_events(self, events):
+    def handle_event(self, sock, fd, event):
         pass
 
 
@@ -96,8 +95,8 @@ class UDPDNSRelay(DNSRelay):
     def add_to_loop(self, loop):
         DNSRelay.add_to_loop(self, loop)
 
-        loop.add(self._local_sock, eventloop.POLL_IN)
-        loop.add(self._remote_sock, eventloop.POLL_IN)
+        loop.add(self._local_sock, eventloop.POLL_IN, self)
+        loop.add(self._remote_sock, eventloop.POLL_IN, self)
 
     def _handle_local(self, sock):
         data, addr = sock.recvfrom(BUF_SIZE)
@@ -142,12 +141,11 @@ class UDPDNSRelay(DNSRelay):
                 traceback.print_exc()
                 logging.error(e)
 
-    def handle_events(self, events):
-        for sock, fd, event in events:
-            if sock == self._local_sock:
-                self._handle_local(sock)
-            elif sock == self._remote_sock:
-                self._handle_remote(sock)
+    def handle_event(self, sock, fd, event):
+        if sock == self._local_sock:
+            self._handle_local(sock)
+        elif sock == self._remote_sock:
+            self._handle_remote(sock)
         now = time.time()
         if now - self._last_time > CACHE_TIMEOUT / 2:
             self._id_to_addr.sweep()
@@ -272,25 +270,22 @@ class TCPDNSRelay(DNSRelay):
 
     def add_to_loop(self, loop):
         DNSRelay.add_to_loop(self, loop)
-        loop.add(self._listen_sock, eventloop.POLL_IN)
+        loop.add(self._listen_sock, eventloop.POLL_IN, self)
 
-    def handle_events(self, events):
-        for sock, fd, event in events:
-            if sock == self._listen_sock:
-                self._handle_conn(sock)
-            elif sock in self._local_to_remote:
-                self._handle_local(sock, event)
-            elif sock in self._remote_to_local:
-                self._handle_remote(sock, event)
+    def handle_event(self, sock, fd, event):
+        if sock == self._listen_sock:
+            self._handle_conn(sock)
+        elif sock in self._local_to_remote:
+            self._handle_local(sock, event)
+        elif sock in self._remote_to_local:
+            self._handle_remote(sock, event)
         # TODO implement timeout
 
 
 def main():
-    shadowsocks_utils.check_python()
+    shadowsocks_shell.check_python()
 
-    config = shadowsocks_utils.get_config(True)
-
-    encrypt.init_table(config['password'], config['method'])
+    config = shadowsocks_shell.get_config(True)
 
     logging.info("starting dns at %s:%d" % (config['local_address'], 53))
 
