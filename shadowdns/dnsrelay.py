@@ -187,8 +187,8 @@ class TCPDNSRelay(DNSRelay):
             self._local_to_remote[local] = remote
             self._remote_to_local[remote] = local
 
-            self._loop.add(local, 0)
-            self._loop.add(remote, eventloop.POLL_OUT)
+            self._loop.add(local, 0, self)
+            self._loop.add(remote, eventloop.POLL_OUT, self)
             try:
                 remote.connect(self._remote_addr)
             except (OSError, IOError) as e:
