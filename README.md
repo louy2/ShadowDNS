@@ -22,8 +22,14 @@ Install
 
 #### Windows:
 
-Install M2Crypto (Google an M2Crypto Windows installer for your python version
- and install it. Might be complicated, need someone to write a help here).
+Install M2Crypto from PyPI:
+
+    # 64-bit Windows and 64-bit Python
+    pip install --egg M2CryptoWin64
+    # 32-bit Windows or 32-bit Python
+    pip install --egg M2CryptoWin32
+
+Then install shadowdns as usual:
 
     easy_install pip
     pip install shadowdns
